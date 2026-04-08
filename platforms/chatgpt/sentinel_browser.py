@@ -39,6 +39,42 @@ def _flow_page_url(flow: str) -> str:
     return mapping.get(flow_name, "https://auth.openai.com/about-you")
 
 
+def _inject_expected_sdk(page: Any, sdk_url: str) -> None:
+    page.evaluate(
+        """
+        async (targetSdkUrl) => {
+            const existing = Array.from(document.scripts || [])
+                .some((item) => item.src === targetSdkUrl);
+            if (existing) return;
+            await new Promise((resolve, reject) => {
+                const script = document.createElement('script');
+                script.src = targetSdkUrl;
+                script.async = true;
+                script.onload = () => resolve(true);
+                script.onerror = () => reject(new Error(`Failed to load ${targetSdkUrl}`));
+                document.head.appendChild(script);
+            });
+        }
+        """,
+        sdk_url,
+    )
+
+
+def _ensure_sdk_loaded(page: Any, *, timeout_ms: int, sdk_url: str) -> None:
+    page.wait_for_load_state("load", timeout=timeout_ms)
+    try:
+        page.wait_for_function(
+            "() => !!window.SentinelSDK && typeof window.SentinelSDK.token === 'function'",
+            timeout=min(timeout_ms, 15000),
+        )
+    except Exception:
+        _inject_expected_sdk(page, sdk_url)
+        page.wait_for_function(
+            "() => !!window.SentinelSDK && typeof window.SentinelSDK.token === 'function'",
+            timeout=min(timeout_ms, 30000),
+        )
+
+
 def _quickjs_script_path() -> Path:
     return (
         Path(__file__).resolve().parents[2]
@@ -360,10 +396,7 @@ def get_sentinel_token_via_browser(
 
             page = context.new_page()
             page.goto(target_url, wait_until="domcontentloaded", timeout=timeout_ms)
-            page.wait_for_function(
-                "() => typeof window.SentinelSDK !== 'undefined' && typeof window.SentinelSDK.token === 'function'",
-                timeout=min(timeout_ms, 15000),
-            )
+            _ensure_sdk_loaded(page, timeout_ms=timeout_ms, sdk_url=SENTINEL_SDK_URL)
 
             result = page.evaluate(
                 """
