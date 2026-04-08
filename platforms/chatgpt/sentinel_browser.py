@@ -19,6 +19,7 @@ from core.proxy_utils import (
     build_requests_proxy_config,
     is_authenticated_socks5_proxy,
 )
+from platforms.chatgpt.utils import build_oai_device_playwright_cookie
 
 
 SENTINEL_VERSION = "20260219f9f6"
@@ -347,14 +348,10 @@ def get_sentinel_token_via_browser(
                 try:
                     context.add_cookies(
                         [
-                            {
-                                "name": "oai-did",
-                                "value": str(device_id),
-                                "url": "https://auth.openai.com/",
-                                "path": "/",
-                                "secure": True,
-                                "sameSite": "Lax",
-                            }
+                            build_oai_device_playwright_cookie(
+                                device_id,
+                                url="https://auth.openai.com/",
+                            )
                         ]
                     )
                 except Exception as ex:

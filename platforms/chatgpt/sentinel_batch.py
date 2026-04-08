@@ -19,6 +19,7 @@ from core.browser_runtime import (
 from core.config_store import ConfigStore, config_store
 from core.proxy_pool import ProxyPool, proxy_pool
 from core.proxy_utils import build_playwright_proxy_config, normalize_proxy_url
+from platforms.chatgpt.utils import build_oai_device_playwright_cookie
 
 
 DEFAULT_SDK_VERSION = "20260219f9f6"
@@ -337,22 +338,14 @@ class PlaywrightSentinelProvider(SentinelProvider):
         )
         self._context.add_cookies(
             [
-                {
-                    "name": "oai-did",
-                    "value": self._device_id,
-                    "url": "https://sentinel.openai.com/",
-                    "path": "/",
-                    "secure": True,
-                    "sameSite": "Lax",
-                },
-                {
-                    "name": "oai-did",
-                    "value": self._device_id,
-                    "url": "https://auth.openai.com/",
-                    "path": "/",
-                    "secure": True,
-                    "sameSite": "Lax",
-                },
+                build_oai_device_playwright_cookie(
+                    self._device_id,
+                    url="https://sentinel.openai.com/",
+                ),
+                build_oai_device_playwright_cookie(
+                    self._device_id,
+                    url="https://auth.openai.com/",
+                ),
             ]
         )
         self._page = self._context.new_page()

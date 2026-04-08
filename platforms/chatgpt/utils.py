@@ -368,3 +368,17 @@ def seed_oai_device_cookie(session, device_id):
             session.cookies.set("oai-did", device_id, domain=domain)
         except Exception:
             continue
+
+
+def build_playwright_cookie(name, value, *, url):
+    """构造 Playwright 兼容的 cookie 对象。"""
+    return {
+        "name": str(name),
+        "value": str(value),
+        "url": url,
+    }
+
+
+def build_oai_device_playwright_cookie(device_id, *, url):
+    """构造注入到 Playwright 上下文中的 oai-did cookie。"""
+    return build_playwright_cookie("oai-did", device_id, url=url)

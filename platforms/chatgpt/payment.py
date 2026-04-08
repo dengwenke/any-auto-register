@@ -12,6 +12,7 @@ from typing import Any, Optional
 from curl_cffi import requests as cffi_requests
 from core.browser_runtime import ensure_browser_display_available
 from core.proxy_utils import build_requests_proxy_config
+from platforms.chatgpt.utils import build_playwright_cookie
 
 # from ..database.models import Account  # removed: external dep
 
@@ -50,22 +51,29 @@ def _extract_oai_did(cookies_str: str) -> Optional[str]:
     return None
 
 
-def _parse_cookie_str(cookies_str: str, domain: str) -> list:
-    """将 'key=val; key2=val2' 格式解析为 Playwright cookie 列表"""
+def _parse_cookie_str(cookies_str: str, url: str) -> list:
+    """将 cookie 字符串解析为 Playwright cookie 列表。"""
+    ignored = {
+        "domain",
+        "path",
+        "expires",
+        "max-age",
+        "secure",
+        "httponly",
+        "samesite",
+        "priority",
+        "partitioned",
+    }
     cookies = []
     for part in cookies_str.split(";"):
         part = part.strip()
-        if "=" not in part:
+        if not part or "=" not in part:
             continue
         name, _, value = part.partition("=")
-        cookies.append(
-            {
-                "name": name.strip(),
-                "value": value.strip(),
-                "domain": domain,
-                "path": "/",
-            }
-        )
+        name = name.strip()
+        if not name or name.lower() in ignored:
+            continue
+        cookies.append(build_playwright_cookie(name, value.strip(), url=url))
     return cookies
 
 
@@ -215,7 +223,7 @@ def open_url_incognito(url: str, cookies_str: Optional[str] = None) -> bool:
                 browser = p.chromium.launch(headless=False, args=["--incognito"])
                 ctx = browser.new_context()
                 if cookies_str:
-                    ctx.add_cookies(_parse_cookie_str(cookies_str, "chatgpt.com"))
+                    ctx.add_cookies(_parse_cookie_str(cookies_str, "https://chatgpt.com/"))
                 page = ctx.new_page()
                 page.goto(url)
                 # 保持窗口打开直到用户关闭
